@@ -71,7 +71,7 @@ sources/linux-${KVERS}.tar.xz:
 sources/linux-${KVERS}: sources/linux-${KVERS}.tar.xz 
 	tar xf sources/linux-${KVERS}.tar.xz -C sources/
 
-sources/linux-${KVERS}/arch/x86_64/boot/bzImage: sources/linux-${KVERS} target config/linux-${KCONFIG} 
+sources/linux-${KVERS}/arch/x86_64/boot/bzImage: sources/linux-${KVERS} target config/linux-${KCONFIG} Makefile 
 	$(mount_chroot)
 	cp config/linux-${KCONFIG} sources/linux-${KVERS}/.config
 	chroot target /bin/bash -c "cd /build/linux-${KVERS}; yes '' | make -j${PARALL} oldconfig"
@@ -88,7 +88,7 @@ sources/busybox-${BVERS}.tar.bz2:
 sources/busybox-${BVERS}: sources/busybox-${BVERS}.tar.bz2
 	tar xf sources/busybox-${BVERS}.tar.bz2 -C sources/
 
-sources/busybox-${BVERS}/busybox: sources/busybox-${BVERS} target config/busybox-${KCONFIG} 
+sources/busybox-${BVERS}/busybox: sources/busybox-${BVERS} target config/busybox-${BCONFIG} Makefile
 	$(mount_chroot)
 	cp config/busybox-${BCONFIG} sources/busybox-${BVERS}/.config
 	chroot target /bin/bash -c "cd /build/busybox-${BVERS}; yes '' | make -j${PARALL} oldconfig"
