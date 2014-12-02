@@ -1,0 +1,69 @@
+#!/bin/busybox sh
+
+error() {
+    echo ERROR! $1
+    exec /bin/busybox sh
+}
+
+/bin/busybox mkdir -p /sys /proc /run /tmp /sbin
+
+/bin/busybox --install -s
+
+mount -t devtmpfs none /dev
+mkdir /dev/pts
+mount -t devpts none /dev/pts
+mount -t sysfs none /sys
+mount -t proc none /proc
+
+mkdir /storage/
+for i in /dev/sd??
+do
+    mount $i /storage || continue
+    sz=`df | grep "/storage$" | grep -o '[0-9]*' | head -n 2 | tail -n 1`
+    [ $sz -gt 20000000 ] && break
+    umount /storage
+done
+mount | grep /storage || error "Failed to mount /storage"
+mkdir -p /storage/casper
+
+PERSIST=`grep -o persistent /proc/cmdline`
+if [ -n "$PERSIST" ]
+then
+    if [ -e /storage/home-rw -a ! -f /storage/home-rw ]
+    then
+        rm -rf /storage/home-rw
+    fi
+    if [ ! -e /storage/home-rw ]
+    then
+        dd if=/dev/zero bs=1M count=0 seek=10240 of=/storage/home-rw
+        mkfs.ext2 /storage/home-rw
+    fi
+fi
+
+BASEURL='http://10.0.0.1/casper/'
+mkdir -p /storage/torrent
+rm -rf /storage/torrent/*.torrent
+IMAGE=`cat /proc/cmdline | grep -o 'imgname=[^\ ]*' | grep -o '[^=]*$'`
+
+cd /storage/torrent
+
+for i in filesystem.squashfs kernel.img initrd.img
+do
+    wget ${BASEURL}/${IMAGE}/$i.torrent
+done
+gettorrent *.torrent || error "Failed to download torrent"
+sync
+
+IP=`ip addr show dev eth0 | grep -o 'inet\ [^\ /]*' | cut -d\  -f2`
+CLASS=`echo $IP | cut -d. -f2`
+X=`echo $IP | cut -d. -f3`
+Y=`echo $IP | cut -d. -f4`
+let X=$X+96
+X=$(printf \\x$(printf $(printf %x $X)))
+[ ${CLASS} -eq 1 ] && HOSTNAME=`printf ioi-$X%02d $Y`
+[ ${CLASS} -eq 2 ] && HOSTNAME=worker$Y
+IP="eth0,${IP},255.0.0.0,10.0.0.1"
+LOCALE=it
+TZ=Europe/Rome
+cd /storage/casper
+kexec kernel.img initrd.img "boot=casper quiet splash username=ioi hostname=${HOSTNAME} ip=${IP} locale=${LOCALE} timezone=${TZ} ${PERSIST}" || error "kexec failed!"
